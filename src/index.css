@@ -1,0 +1,27 @@
+@import "tailwindcss";
+@source "../index.html";
+@source "./**/*.{js,jsx,ts,tsx}";
+
+:root {
+  color-scheme: dark;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 392px;
+  background: #090b13;
+}
+
+#root {
+  width: 392px;
+  max-width: 100%;
+  margin: 0;
+  text-align: left;
+  min-height: 640px;
+  display: block;
+  box-sizing: border-box;
+}
