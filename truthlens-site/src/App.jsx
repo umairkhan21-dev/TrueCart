@@ -450,7 +450,7 @@ function HomePage() {
                 </svg>
                 Add to Chrome — Free
               </a>
-              <a href="#" className="btn-ghost">
+              {/* <a href="#" className="btn-ghost">
                 View on Chrome Web Store
                 <svg
                   width="16"
@@ -465,7 +465,7 @@ function HomePage() {
                   <line x1="5" y1="12" x2="19" y2="12" />
                   <polyline points="12 5 19 12 12 19" />
                 </svg>
-              </a>
+              </a> */}
             </div>
           </div>
         </div>
