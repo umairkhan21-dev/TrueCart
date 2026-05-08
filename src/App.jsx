@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 
-const API_BASE_URL = "truecart-production.up.railway.app";
+const API_BASE_URL = "https://truecart-production.up.railway.app";
 
 function InsightCard({ tone, label, items }) {
   if (!items?.length) return null;
