@@ -470,6 +470,24 @@ function HomePage() {
           </div>
         </div>
       </section>
+      <section className="coming-soon">
+        <div className="coming-soon-badge">
+          Mobile App Coming Soon
+        </div>
+        <h2>TrueCart Mobile App</h2>
+        <p>Scan reviews instantly inside Amazon, Flipkart, Myntra and more —
+          directly on your phone.</p>
+        <div className="store-buttons">
+          <button className="store-btn disabled">
+            <span>📱</span>
+            Android - Coming Soon
+          </button>
+          <button className="store-btn disabled">
+            <span>🍎</span>
+            IOS - Coming Soon
+          </button>
+        </div>
+      </section>
     </>
   );
 }
@@ -481,7 +499,7 @@ function SiteNav({ currentPath, navRef, onRouteClick }) {
     <nav ref={navRef} className="truthlens-nav" id="nav">
       <a href="/" className="nav-logo" onClick={(event) => onRouteClick(event, "/")}>
         {/* <div className="nav-logo-dot" /> */}
-        <img src="/maintrueecart-logo-removebg-preview.png" alt="TrueCart" className="nav-logo-image"/>
+        <img src="/maintrueecart-logo-removebg-preview.png" alt="TrueCart" className="nav-logo-image" />
         TrueCart
       </a>
 
