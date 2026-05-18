@@ -1204,5 +1204,10 @@ function waitForProduct() {
     }, 1000);
 }
 
-waitForProduct();
+if (
+    window.location.hostname.includes("amazon.") ||
+    window.location.hostname.includes("flipkart.")
+) {
+    waitForProduct();
+}
 }
