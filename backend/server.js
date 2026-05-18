@@ -126,14 +126,40 @@ function buildUnavailableMarketplaceResult(store, reason, statusCode = null) {
 }
 
 function getMarketplaceSearchHeaders(url) {
+
     return {
         "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-IN,en;q=0.9",
-        "Cache-Control": "no-cache",
-        "Pragma": "no-cache",
-        "Referer": url,
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+
+        "Accept":
+            "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+
+        "Accept-Language":
+            "en-US,en;q=0.9",
+
+        "Cache-Control":
+            "no-cache",
+
+        "Pragma":
+            "no-cache",
+
+        "Upgrade-Insecure-Requests":
+            "1",
+
+        "Referer":
+            "https://www.google.com/",
+
+        "Sec-Fetch-Dest":
+            "document",
+
+        "Sec-Fetch-Mode":
+            "navigate",
+
+        "Sec-Fetch-Site":
+            "cross-site",
+
+        "Sec-Fetch-User":
+            "?1",
     };
 }
 
@@ -798,7 +824,7 @@ Return ONLY this JSON structure:
             alternatives = [];
         }
 
-        
+
         if (alternatives.length >= 2) {
             return res.json({
                 success: true,
@@ -807,7 +833,7 @@ Return ONLY this JSON structure:
             });
         }
 
-        
+
         const keywords = clean.split(" ").slice(0, 4).join(" ");
         return res.json({
             success: false,
@@ -824,6 +850,145 @@ Return ONLY this JSON structure:
             alternatives: [],
             fallbackUrl: `https://www.amazon.in/s?k=${encodeURIComponent(keywords)}`,
             message: "Service temporarily unavailable",
+        });
+    }
+});
+
+
+async function extractAmazonProductData(url) {
+    const result = await fetchMarketplaceHtml(url, "amazon");
+
+    if (!result.ok) {
+        throw new error("failes to fetch amazon product page");
+    }
+    const html = result.html;
+    const $ = cheerio.load(html);
+
+    const title = $("#productTitle").text().trim() ||
+        $("#title").text().trim();
+
+    const price = $(".a-price .a-offscreen").first().text().trim();
+    const rating = $("a-icon-alt").first().text().trim();
+    const reviewCount = $("csrCustomerReviewText").first().text().trim();
+    const reviews = [];
+    $(".review-text-content span").each((_, el) => {
+        const text = $(el).text().trim();
+
+        if (text.length > 20) {
+            reviews.push(text);
+        }
+    });
+    return {
+        title,
+        rating,
+        price,
+        reviewCount,
+        reviews: reviews.slice(0, 10),
+    };
+}
+
+app.post("/analyze-url", async (req, res) => {
+    try {
+        const { url } = req.body;
+
+        if (!url || !url.includes("amazon")) {
+            return res.status(400).json({
+                error: "valid amazon url required"
+            });
+        }
+
+        const productData = await extractAmazonProductData(url);
+        const {
+            title,
+            rating,
+            price,
+            reviewCount,
+            reviews,
+        } = productData;
+
+        if (!title) {
+            return res.status(400).json({
+                error: "Could not extract product data"
+            });
+        }
+        const safeReviews = Array.isArray(reviews) ? reviews.slice(0, 5) : [];
+
+        if (!safeReviews.length) {
+            return res.json({
+                result: buildLimitedEvidenceResult({
+                    price,
+                    rating,
+                    reviewCount
+                }),
+                product: productData,
+            });
+        }
+        const prompt = `You are a product analyst.
+
+Analyze the product ONLY using the provided data.
+
+Product Data:
+Title: ${title}
+Price: ${price || "Not available"}
+Rating: ${rating || "Not available"}
+Review Count: ${reviewCount || "Not available"}
+
+User Reviews:
+${safeReviews.map((r, i) => `${i + 1}. ${r}`).join("\n")}
+
+Return ONLY valid JSON.`;
+
+       const response = await openai.chat.completions.create({
+        model: "meta-llama/llama-3-8b-instruct",
+
+        messages:[
+            {
+                role: "system",
+                content: "return only valid JSON."
+            },
+            {
+                role: "user",
+                content: prompt,
+            }
+        ],
+        temperature: 0.2,
+       });
+
+       const text = getMessageText(response.choices[0]?.message?.content);
+
+       let parsed;
+       try{
+        parsed = parseAnalysisResponse(text);
+       } catch {
+        parsed = {
+            keyInsights: [
+                "could not analyze properly"
+            ],
+            whatUsersLove: [],
+            topComplaints: [],
+            riskAlerts: [],
+            shouldYouBuy: {
+                buyIf: [],
+                avoidIf: [],
+            },
+            priceAnalysis: {
+                verdict: "unknown",
+                insight: "Ai parsing failed",
+            },
+            confidence: "Low"
+        };
+       }
+
+       return res.json({
+        success: true,
+        productData: productData,
+        result: parsed,
+       });
+       
+    } catch{
+        console.error(error);
+        return res.status(500).json({
+            error: error?.message || "something went wrong",
         });
     }
 });
