@@ -170,26 +170,26 @@ if (window.__truecartContentLoaded) {
         });
     }
 
-    async function scrollForDynamicReviews({ steps = 6, stepSize = 700, delayMs = 450 } = {}) {
-        const startY = window.scrollY;
-        let lastHeight = document.body?.scrollHeight || 0;
+    // async function scrollForDynamicReviews({ steps = 6, stepSize = 700, delayMs = 450 } = {}) {
+    //     const startY = window.scrollY;
+    //     let lastHeight = document.body?.scrollHeight || 0;
 
-        for (let step = 0; step < steps; step++) {
-            const nextY = Math.min(window.scrollY + stepSize, document.body?.scrollHeight || window.scrollY);
-            window.scrollTo({ top: nextY, behavior: "auto" });
-            await delay(delayMs);
+    //     for (let step = 0; step < steps; step++) {
+    //         const nextY = Math.min(window.scrollY + stepSize, document.body?.scrollHeight || window.scrollY);
+    //         window.scrollTo({ top: nextY, behavior: "auto" });
+    //         await delay(delayMs);
 
-            const currentHeight = document.body?.scrollHeight || 0;
-            if (currentHeight <= lastHeight && nextY === window.scrollY) {
-                break;
-            }
+    //         const currentHeight = document.body?.scrollHeight || 0;
+    //         if (currentHeight <= lastHeight && nextY === window.scrollY) {
+    //             break;
+    //         }
 
-            lastHeight = currentHeight;
-        }
+    //         lastHeight = currentHeight;
+    //     }
 
-        window.scrollTo({ top: startY, behavior: "auto" });
-        await delay(200);
-    }
+    //     window.scrollTo({ top: startY, behavior: "auto" });
+    //     await delay(200);
+    // }
 
     function splitIntoReviewSentences(text) {
         if (!text) {
@@ -335,7 +335,7 @@ if (window.__truecartContentLoaded) {
     }
 
     async function getReviewsWithoutClass(limit = 6) {
-        await scrollForDynamicReviews();
+        // await scrollForDynamicReviews();
         await delay(500);
 
         const nodes = Array.from(document.querySelectorAll("p, div, span"));
