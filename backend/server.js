@@ -552,6 +552,7 @@ const openai = new OpenAI({
 });
 
 app.post("/analyze", async (req, res) => {
+    const source = req.query.source;
     console.log("request received", req.body);
     try {
         const { title, price, rating, reviewCount, reviews } = req.body;
@@ -674,7 +675,13 @@ Rules:
             };
         }
 
-        res.json({ result: parsed });
+        if (source === "app") {
+            return res.json({
+                result: parsed,
+            });
+        }
+
+        return res.json(parsed);
     } catch (error) {
         console.error(error);
         res.status(500).json({ err: error?.message || "something went wrong" });
@@ -938,54 +945,54 @@ ${safeReviews.map((r, i) => `${i + 1}. ${r}`).join("\n")}
 
 Return ONLY valid JSON.`;
 
-       const response = await openai.chat.completions.create({
-        model: "meta-llama/llama-3-8b-instruct",
+        const response = await openai.chat.completions.create({
+            model: "meta-llama/llama-3-8b-instruct",
 
-        messages:[
-            {
-                role: "system",
-                content: "return only valid JSON."
-            },
-            {
-                role: "user",
-                content: prompt,
-            }
-        ],
-        temperature: 0.2,
-       });
-
-       const text = getMessageText(response.choices[0]?.message?.content);
-
-       let parsed;
-       try{
-        parsed = parseAnalysisResponse(text);
-       } catch {
-        parsed = {
-            keyInsights: [
-                "could not analyze properly"
+            messages: [
+                {
+                    role: "system",
+                    content: "return only valid JSON."
+                },
+                {
+                    role: "user",
+                    content: prompt,
+                }
             ],
-            whatUsersLove: [],
-            topComplaints: [],
-            riskAlerts: [],
-            shouldYouBuy: {
-                buyIf: [],
-                avoidIf: [],
-            },
-            priceAnalysis: {
-                verdict: "unknown",
-                insight: "Ai parsing failed",
-            },
-            confidence: "Low"
-        };
-       }
+            temperature: 0.2,
+        });
 
-       return res.json({
-        success: true,
-        productData: productData,
-        result: parsed,
-       });
-       
-    } catch{
+        const text = getMessageText(response.choices[0]?.message?.content);
+
+        let parsed;
+        try {
+            parsed = parseAnalysisResponse(text);
+        } catch {
+            parsed = {
+                keyInsights: [
+                    "could not analyze properly"
+                ],
+                whatUsersLove: [],
+                topComplaints: [],
+                riskAlerts: [],
+                shouldYouBuy: {
+                    buyIf: [],
+                    avoidIf: [],
+                },
+                priceAnalysis: {
+                    verdict: "unknown",
+                    insight: "Ai parsing failed",
+                },
+                confidence: "Low"
+            };
+        }
+
+        return res.json({
+            success: true,
+            productData: productData,
+            result: parsed,
+        });
+
+    } catch {
         console.error(error);
         return res.status(500).json({
             error: error?.message || "something went wrong",
