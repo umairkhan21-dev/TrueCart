@@ -675,13 +675,9 @@ Rules:
             };
         }
 
-        if (source === "app") {
-            return res.json({
-                result: parsed,
-            });
-        }
-
-        return res.json(parsed);
+        return res.json({
+            result: parsed,
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ err: error?.message || "something went wrong" });
