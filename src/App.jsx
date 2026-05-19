@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import "./App.css";
 
 const API_BASE_URL = "https://truecart-production.up.railway.app";
+const MARKETPLACE_LOOKUP_FALLBACK_MESSAGE = "No matching listing found";
 
 function InsightCard({ tone, label, items }) {
   if (!items?.length) return null;
@@ -90,6 +91,75 @@ async function readJsonResponse(res) {
   }
 }
 
+function buildNoMatchComparison(productTitle, currentPrice, currentStore, competitorStore) {
+  return {
+    query: productTitle || "",
+    current: {
+      store: currentStore || "unknown",
+      price: currentPrice || null,
+      inStock: true,
+    },
+    competitor: {
+      found: false,
+      store: competitorStore,
+      unavailable: false,
+    },
+    summary: {
+      canSave: false,
+      savingsAmount: null,
+      bestStore: currentStore || "unknown",
+      sourceStore: currentStore || "unknown",
+      targetStore: competitorStore,
+      comparisonAvailable: false,
+    },
+  };
+}
+
+function sanitizeComparisonResponse(data, { productTitle, currentPrice, currentStore }) {
+  const sourceStore = currentStore || "unknown";
+  const targetStore = sourceStore === "flipkart" ? "amazon" : "flipkart";
+  const fallback = buildNoMatchComparison(productTitle, currentPrice, sourceStore, targetStore);
+
+  if (!data || typeof data !== "object") {
+    console.warn("TrueCart compare: invalid response payload", data);
+    return fallback;
+  }
+
+  const competitor = data.competitor;
+  const hasValidMatch =
+    Boolean(competitor?.found) &&
+    typeof competitor?.price === "string" &&
+    competitor.price.trim() &&
+    typeof competitor?.store === "string" &&
+    competitor.store.trim();
+
+  if (!hasValidMatch) {
+    if (competitor?.unavailable || competitor?.reason || competitor?.statusCode) {
+      console.warn("TrueCart compare: marketplace lookup fallback", competitor);
+    } else if (competitor && competitor.found !== false) {
+      console.warn("TrueCart compare: incomplete competitor match", competitor);
+    }
+
+    return {
+      ...fallback,
+      current: {
+        ...fallback.current,
+        ...data.current,
+      },
+      summary: {
+        ...fallback.summary,
+        ...(data.summary && typeof data.summary === "object" ? data.summary : {}),
+        canSave: false,
+        savingsAmount: null,
+        bestStore: data?.current?.store || sourceStore,
+        comparisonAvailable: false,
+      },
+    };
+  }
+
+  return data;
+}
+
 function CompareLoadingView({ product, onBack }) {
   return (
     <div className="truthlens-shell">
@@ -136,8 +206,8 @@ function CompareErrorView({ product, error, onRetry, onBack }) {
         </div>
 
         <div className="compare-error-card">
-          <div className="compare-error-title">Could not compare prices right now</div>
-          <p className="compare-error-copy">{error || "Please try again in a moment."}</p>
+          <div className="compare-error-title">{MARKETPLACE_LOOKUP_FALLBACK_MESSAGE}</div>
+          <p className="compare-error-copy">{error || MARKETPLACE_LOOKUP_FALLBACK_MESSAGE}</p>
         </div>
 
         <div className="actions compare-actions">
@@ -158,19 +228,16 @@ function CompareResultView({ product, comparison, onBack }) {
   const currentPrice = comparison?.current?.price || "N/A";
   const competitorStore = formatStoreName(comparison?.competitor?.store);
   const competitorFound = Boolean(comparison?.competitor?.found);
-  const competitorUnavailable = Boolean(comparison?.competitor?.unavailable);
-  const competitorPrice = competitorFound ? comparison.competitor.price : "Not found";
+  const competitorPrice = competitorFound ? comparison.competitor.price : MARKETPLACE_LOOKUP_FALLBACK_MESSAGE;
 
   const currentValue = parsePriceValue(comparison?.current?.price);
   const targetValue = parsePriceValue(comparison?.competitor?.price);
   const canSave = Boolean(comparison?.summary?.canSave);
   const savingsAmount = comparison?.summary?.savingsAmount || formatCurrency((currentValue ?? 0) - (targetValue ?? 0));
   const bestStore = formatStoreName(comparison?.summary?.bestStore);
-  const competitorMessage = competitorUnavailable
-    ? comparison?.competitor?.reason || `${competitorStore} comparison is temporarily unavailable`
-    : competitorFound
-      ? `Match score ${comparison.competitor.score || 0}%`
-      : "No reliable match found";
+  const competitorMessage = competitorFound
+    ? `Match score ${comparison.competitor.score || 0}%`
+    : MARKETPLACE_LOOKUP_FALLBACK_MESSAGE;
 
   return (
     <div className="truthlens-shell">
@@ -189,12 +256,12 @@ function CompareResultView({ product, comparison, onBack }) {
           <div className="compare-savings-icon">{canSave ? "₹" : "•"}</div>
           <div>
             <div className="compare-savings-kicker">
-              {canSave ? "You could save" : competitorUnavailable ? "Comparison limited right now" : "Best visible price right now"}
+              {canSave ? "You could save" : "Best visible price right now"}
             </div>
             <div className="compare-savings-value">
               {canSave ? savingsAmount : currentPrice}
               <span>
-                {canSave ? ` by switching to ${bestStore}` : competitorUnavailable ? ` while checking ${competitorStore}` : ` on ${bestStore}`}
+                {canSave ? ` by switching to ${bestStore}` : ` on ${bestStore}`}
               </span>
             </div>
           </div>
@@ -237,18 +304,12 @@ function CompareResultView({ product, comparison, onBack }) {
             <span>{competitorStore}</span>
             <span>{competitorPrice}</span>
             <span className={`compare-stock ${competitorFound ? "in" : "out"}`}>
-              {competitorFound ? "Found" : competitorUnavailable ? "Blocked" : "No match"}
+              {competitorFound ? "Found" : "No match"}
             </span>
           </div>
         </section>
 
         <div className="compare-footnote">Based on live listing prices available at compare time.</div>
-
-        {competitorUnavailable ? (
-          <div className="compare-inline-note">
-            {competitorMessage}. The popup is working, but the marketplace blocked the automated lookup.
-          </div>
-        ) : null}
 
         <div className="actions compare-actions">
           {competitorFound ? (
@@ -258,10 +319,6 @@ function CompareResultView({ product, comparison, onBack }) {
               onClick={() => window.open(comparison.competitor.url, "_blank")}
             >
               {canSave ? `Go to ${competitorStore} — Save ${savingsAmount}` : `Open ${competitorStore} Match`}
-            </button>
-          ) : competitorUnavailable ? (
-            <button type="button" className="action-button primary" disabled>
-              {competitorStore} Temporarily Unavailable
             </button>
           ) : null}
 
@@ -500,6 +557,7 @@ function App() {
       setCompareState({ loading: true, error: "" });
       setPriceComparison(null);
       setActiveView("compare-loading");
+      const currentStore = productMeta.site || "current page";
 
       const res = await fetch(`${API_BASE_URL}/compare-price`, {
         method: "POST",
@@ -509,19 +567,25 @@ function App() {
         body: JSON.stringify({
           title: product,
           currentPrice: productMeta.price,
-          currentStore: productMeta.site || "current page",
+          currentStore,
         }),
       });
 
       const data = await readJsonResponse(res);
+      const sanitizedComparison = sanitizeComparisonResponse(data, {
+        productTitle: product,
+        currentPrice: productMeta.price,
+        currentStore,
+      });
 
-      setPriceComparison(data);
+      setPriceComparison(sanitizedComparison);
       setActiveView("compare-result");
       setCompareState({ loading: false, error: "" });
     } catch (error) {
+      console.warn("TrueCart compare request failed:", error);
       setCompareState({
         loading: false,
-        error: error.message || "Could not compare prices",
+        error: MARKETPLACE_LOOKUP_FALLBACK_MESSAGE,
       });
       setActiveView("compare-error");
     }
