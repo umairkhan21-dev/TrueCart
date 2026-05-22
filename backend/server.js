@@ -982,13 +982,15 @@ Return ONLY valid JSON.`;
             };
         }
 
+        console.log(typeof parsed);
+        console.log(parsed);
         return res.json({
             success: true,
             productData: productData,
             result: parsed,
         });
 
-    } catch (error){
+    } catch (error) {
         console.error(error);
         return res.status(500).json({
             error: error?.message || "something went wrong",
