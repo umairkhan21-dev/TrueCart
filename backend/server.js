@@ -862,17 +862,24 @@ async function extractAmazonProductData(url) {
     const result = await fetchMarketplaceHtml(url, "amazon");
 
     if (!result.ok) {
-        throw new error("failes to fetch amazon product page");
+        throw new Error("failes to fetch amazon product page");
     }
     const html = result.html;
+
+    if (
+        html.includes("captcha") ||
+        html.includes("enter the characters you see")
+    ){
+        throw new Error("amazon blocked request");
+    }
     const $ = cheerio.load(html);
 
     const title = $("#productTitle").text().trim() ||
-        $("#title").text().trim();
+        $("#title").text().trim() || "" ;
 
-    const price = $(".a-price .a-offscreen").first().text().trim();
-    const rating = $("a-icon-alt").first().text().trim();
-    const reviewCount = $("csrCustomerReviewText").first().text().trim();
+    const price = $(".a-price .a-offscreen").first().text().trim() || "";
+    const rating = $(".a-icon-alt").first().text().trim() || "";
+    const reviewCount = $("#acrCustomerReviewText").first().text().trim() || "";
     const reviews = [];
     $(".review-text-content span").each((_, el) => {
         const text = $(el).text().trim();
@@ -881,6 +888,13 @@ async function extractAmazonProductData(url) {
             reviews.push(text);
         }
     });
+
+    console.log("TITLE:", title);
+    console.log("PRICE:", price);
+    console.log("RATING:", rating);
+    console.log("REVIEWS:", reviews.length);
+
+    
     return {
         title,
         rating,
