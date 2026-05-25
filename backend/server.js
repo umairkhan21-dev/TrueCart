@@ -894,7 +894,7 @@ async function extractAmazonProductData(url) {
     console.log("RATING:", rating);
     console.log("REVIEWS:", reviews.length);
 
-    
+
     return {
         title,
         rating,
@@ -908,7 +908,7 @@ app.post("/analyze-url", async (req, res) => {
     try {
         const { url } = req.body;
 
-        if (!url || !url.includes("amazon")) {
+        if (!url || !url.includes("amazon") && !url || !url.includes("amazon.in")) {
             return res.status(400).json({
                 error: "valid amazon url required"
             });
