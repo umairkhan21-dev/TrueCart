@@ -904,113 +904,113 @@ async function extractAmazonProductData(url) {
     };
 }
 
-app.post("/analyze-url", async (req, res) => {
-    try {
-        const { url } = req.body;
+// app.post("/analyze-url", async (req, res) => {
+//     try {
+//         const { url } = req.body;
 
-        if (!url || !url.includes("amazon") && !url || !url.includes("amazon.in")) {
-            return res.status(400).json({
-                error: "valid amazon url required"
-            });
-        }
+//         if (!url || !url.includes("amazon") && !url || !url.includes("amazon.in")) {
+//             return res.status(400).json({
+//                 error: "valid amazon url required"
+//             });
+//         }
 
-        const productData = await extractAmazonProductData(url);
-        const {
-            title,
-            rating,
-            price,
-            reviewCount,
-            reviews,
-        } = productData;
+//         const productData = await extractAmazonProductData(url);
+//         const {
+//             title,
+//             rating,
+//             price,
+//             reviewCount,
+//             reviews,
+//         } = productData;
 
-        if (!title) {
-            return res.status(400).json({
-                error: "Could not extract product data"
-            });
-        }
-        const safeReviews = Array.isArray(reviews) ? reviews.slice(0, 5) : [];
+//         if (!title) {
+//             return res.status(400).json({
+//                 error: "Could not extract product data"
+//             });
+//         }
+//         const safeReviews = Array.isArray(reviews) ? reviews.slice(0, 5) : [];
 
-        if (!safeReviews.length) {
-            return res.json({
-                result: buildLimitedEvidenceResult({
-                    price,
-                    rating,
-                    reviewCount
-                }),
-                product: productData,
-            });
-        }
-        const prompt = `You are a product analyst.
+//         if (!safeReviews.length) {
+//             return res.json({
+//                 result: buildLimitedEvidenceResult({
+//                     price,
+//                     rating,
+//                     reviewCount
+//                 }),
+//                 product: productData,
+//             });
+//         }
+//         const prompt = `You are a product analyst.
 
-Analyze the product ONLY using the provided data.
+// Analyze the product ONLY using the provided data.
 
-Product Data:
-Title: ${title}
-Price: ${price || "Not available"}
-Rating: ${rating || "Not available"}
-Review Count: ${reviewCount || "Not available"}
+// Product Data:
+// Title: ${title}
+// Price: ${price || "Not available"}
+// Rating: ${rating || "Not available"}
+// Review Count: ${reviewCount || "Not available"}
 
-User Reviews:
-${safeReviews.map((r, i) => `${i + 1}. ${r}`).join("\n")}
+// User Reviews:
+// ${safeReviews.map((r, i) => `${i + 1}. ${r}`).join("\n")}
 
-Return ONLY valid JSON.`;
+// Return ONLY valid JSON.`;
 
-        const response = await openai.chat.completions.create({
-            model: "meta-llama/llama-3-8b-instruct",
+//         const response = await openai.chat.completions.create({
+//             model: "meta-llama/llama-3-8b-instruct",
 
-            messages: [
-                {
-                    role: "system",
-                    content: "return only valid JSON."
-                },
-                {
-                    role: "user",
-                    content: prompt,
-                }
-            ],
-            temperature: 0.2,
-        });
+//             messages: [
+//                 {
+//                     role: "system",
+//                     content: "return only valid JSON."
+//                 },
+//                 {
+//                     role: "user",
+//                     content: prompt,
+//                 }
+//             ],
+//             temperature: 0.2,
+//         });
 
-        const text = getMessageText(response.choices[0]?.message?.content);
+//         const text = getMessageText(response.choices[0]?.message?.content);
 
-        let parsed;
-        try {
-            parsed = parseAnalysisResponse(text);
-        } catch {
-            parsed = {
-                keyInsights: [
-                    "could not analyze properly"
-                ],
-                whatUsersLove: [],
-                topComplaints: [],
-                riskAlerts: [],
-                shouldYouBuy: {
-                    buyIf: [],
-                    avoidIf: [],
-                },
-                priceAnalysis: {
-                    verdict: "unknown",
-                    insight: "Ai parsing failed",
-                },
-                confidence: "Low"
-            };
-        }
+//         let parsed;
+//         try {
+//             parsed = parseAnalysisResponse(text);
+//         } catch {
+//             parsed = {
+//                 keyInsights: [
+//                     "could not analyze properly"
+//                 ],
+//                 whatUsersLove: [],
+//                 topComplaints: [],
+//                 riskAlerts: [],
+//                 shouldYouBuy: {
+//                     buyIf: [],
+//                     avoidIf: [],
+//                 },
+//                 priceAnalysis: {
+//                     verdict: "unknown",
+//                     insight: "Ai parsing failed",
+//                 },
+//                 confidence: "Low"
+//             };
+//         }
 
-        console.log(typeof parsed);
-        console.log(parsed);
-        return res.json({
-            success: true,
-            productData: productData,
-            result: parsed,
-        });
+//         console.log(typeof parsed);
+//         console.log(parsed);
+//         return res.json({
+//             success: true,
+//             productData: productData,
+//             result: parsed,
+//         });
 
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({
-            error: error?.message || "something went wrong",
-        });
-    }
-});
+//     } catch (error) {
+//         console.error(error);
+//         return res.status(500).json({
+//             error: error?.message || "something went wrong",
+//         });
+//     }
+// });
 
 // app.listen(PORT, () => {
 //   console.log(`Server running on http://localhost:${PORT}`);
