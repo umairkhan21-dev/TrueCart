@@ -821,7 +821,7 @@ function App() {
         <section className="hero-panel fade-up">
           <div className="hero-topbar">
             <div>
-              <h1 className="brand-title">Truth<span>Lens</span></h1>
+              <h1 className="brand-title">True<span>Cart</span></h1>
               <div className="brand-subtitle">
                 <span className="brand-dot" />
                 AI Product Insights
