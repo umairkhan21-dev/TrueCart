@@ -728,8 +728,10 @@ if (window.__truecartContentLoaded) {
 
         const price =
             normalizePrice(
-                document.querySelector(".a-price .a-offscreen")?.innerText ||
-                document.querySelector("#corePriceDisplay_desktop_feature_div .a-offscreen")?.innerText
+                document.querySelector(".a-price .a-offscreen")?.textContent ||
+                document.querySelector("#corePriceDisplay_desktop_feature_div .a-offscreen")?.textContent ||
+                document.querySelector("#corePrice_feature_div .a-offscreen")?.textContent ||
+                 document.querySelector(".a-price-whole")?.textContent
             ) || null;
 
         const rating =
