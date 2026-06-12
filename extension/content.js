@@ -736,12 +736,14 @@ if (window.__truecartContentLoaded) {
 
         const rating =
             document.querySelector("#acrPopover .a-size-base")?.innerText?.match(/[\d.]+/)?.[0] ||
-            document.querySelector(".a-icon-alt")?.innerText?.match(/[\d.]+/)?.[0] ||
+            document.querySelector(".a-icon-alt")?.textContent?.match(/[\d.]+/)?.[0] ||
             null;
 
         const reviewCount =
             document.querySelector("#acrCustomerReviewText")?.innerText
-                ?.replace(/,/g, "").match(/\d+/)?.[0] || null;
+                ?.replace(/,/g, "").match(/\d+/)?.[0] || 
+            document.querySelector("#acrCustomerReviewText")?.textContent?.replace(/,/g, "").match(/\d+/)?.[0] ||
+            null;
 
         console.log("TrueCart Amazon: title:", title, "| rating:", rating, "| reviewCount:", reviewCount);
 
@@ -771,16 +773,15 @@ async function fetchAmazonReviews(limit = 5) {
     const asin = asinMatch[1];
     console.log("TrueCart: fetching reviews for ASIN:", asin);
 
-    const reviewUrl = `https://www.amazon.in/product-reviews/${asin}?ie=UTF8&reviewerType=all_reviews&sortBy=recent&pageNumber=1`;
-
+const reviewUrl = `${window.location.origin}/product-reviews/${asin}?ie=UTF8&reviewerType=all_reviews&sortBy=recent&pageNumber=1`;
     try {
         const response = await fetch(reviewUrl, {
             method: "GET",
             credentials: "include",
             headers: {
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "en-IN,en;q=0.9",
-                "Referer": `https://www.amazon.in/dp/${asin}`,
+                "Accept-Language": navigator.language || "en-IN,en;q=0.9",
+                "Referer": `${window.location.origin}/dp/${asin}`,
                 "Sec-Fetch-Dest": "document",
                 "Sec-Fetch-Mode": "navigate",
                 "Sec-Fetch-Site": "same-origin",
