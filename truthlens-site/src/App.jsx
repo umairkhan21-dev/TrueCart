@@ -180,7 +180,10 @@ function HomePage() {
                 so you can evaluate product quality, risks, and value with confidence.
               </p>
               <div className="hero-cta-row">
-                <a href="#" className="btn-primary">
+                <a href="https://chromewebstore.google.com/detail/truecart/adilolfcfapggobgljjapjgcoklljnih"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-primary">
                   <svg
                     width="16"
                     height="16"
@@ -433,7 +436,10 @@ function HomePage() {
               Your review intelligence assistant is one click away. Free forever.
             </p>
             <div className="cta-btn-wrap">
-              <a href="#" className="btn-primary">
+              <a href="https://chromewebstore.google.com/detail/truecart/adilolfcfapggobgljjapjgcoklljnih"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-primary">
                 <svg
                   width="16"
                   height="16"
@@ -538,9 +544,18 @@ function SiteNav({ currentPath, navRef, onRouteClick }) {
         </ul>
       )}
 
-      <button type="button" className="nav-cta">
-        Add to Chrome — Free
-      </button>
+     <button
+  type="button"
+  className="nav-cta"
+  onClick={() =>
+    window.open(
+      "https://chromewebstore.google.com/detail/truecart/adilolfcfapggobgljjapjgcoklljnih",
+      "_blank"
+    )
+  }
+>
+  Add to Chrome — Free
+</button>
     </nav>
   );
 }
