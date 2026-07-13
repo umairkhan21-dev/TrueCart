@@ -7,6 +7,7 @@ import axios from "axios"
 
 dotenv.config();
 const PORT = 5000;
+const AI_MODEL = "meta-llama/llama-3.1-70b-instruct";
 
 
 function cleanTitle(title) {
@@ -638,7 +639,7 @@ Rules:
 - Do not include explanations outside JSON`;
 
         const response = await openai.chat.completions.create({
-            model: "meta-llama/llama-3-8b-instruct",
+            model: AI_MODEL,
             messages: [
                 {
                     role: "system",
@@ -759,7 +760,7 @@ app.post("/alternatives", async (req, res) => {
 
     try {
         const response = await openai.chat.completions.create({
-            model: "meta-llama/llama-3.1-70b-instruct",
+            model: AI_MODEL,
             messages: [{
                 role: "system",
                 content: "You are a product research expert for the Indian market. Return only valid JSON. No markdown fences. No explanation outside JSON."
@@ -956,7 +957,7 @@ async function extractAmazonProductData(url) {
 // Return ONLY valid JSON.`;
 
 //         const response = await openai.chat.completions.create({
-//             model: "meta-llama/llama-3-8b-instruct",
+//             model: AI_MODEL,
 
 //             messages: [
 //                 {
