@@ -495,6 +495,10 @@ if (window.__truecartContentLoaded) {
     }
 
     function hasEnoughFlipkartEvidence(data) {
+        return hasEnoughProductEvidence(data);
+    }
+
+    function hasEnoughProductEvidence(data) {
         if (!data?.title) {
             return false;
         }
@@ -503,7 +507,79 @@ if (window.__truecartContentLoaded) {
             return true;
         }
 
-        return Boolean(data.price && data.rating && data.reviewCount);
+        return Boolean(data.price && (data.rating || data.reviewCount));
+    }
+
+    function extractJsonObjectFromText(text, startIndex = 0) {
+        const start = text.indexOf("{", startIndex);
+
+        if (start === -1) {
+            return null;
+        }
+
+        let depth = 0;
+        let inString = false;
+        let escaped = false;
+
+        for (let i = start; i < text.length; i++) {
+            const ch = text[i];
+
+            if (inString) {
+                if (escaped) {
+                    escaped = false;
+                } else if (ch === "\\") {
+                    escaped = true;
+                } else if (ch === "\"") {
+                    inString = false;
+                }
+                continue;
+            }
+
+            if (ch === "\"") {
+                inString = true;
+            } else if (ch === "{") {
+                depth += 1;
+            } else if (ch === "}") {
+                depth -= 1;
+
+                if (depth === 0) {
+                    try {
+                        return JSON.parse(text.slice(start, i + 1));
+                    } catch {
+                        return null;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    function findInlineScriptJson(marker) {
+        const scripts = Array.from(document.querySelectorAll("script:not([src])"));
+
+        for (const script of scripts) {
+            const text = script.textContent || "";
+            const markerIndex = text.indexOf(marker);
+
+            if (markerIndex === -1) {
+                continue;
+            }
+
+            const equalsIndex = text.indexOf("=", markerIndex);
+
+            if (equalsIndex === -1) {
+                continue;
+            }
+
+            const parsed = extractJsonObjectFromText(text, equalsIndex);
+
+            if (parsed) {
+                return parsed;
+            }
+        }
+
+        return null;
     }
 
     function findFlipkartReviewCountFromBody() {
@@ -959,86 +1035,447 @@ async function scrapeFlipkartWithFallback() {
     });
 }
 
-function scrapeMyntra() {
-    return normalizeData({
-        title:
-            document.querySelector("h1")?.innerText?.trim() ||
-            document.querySelector(".pdp-title")?.innerText?.trim() ||
-            null,
-        price:
-            normalizePrice(
-                document.querySelector(".pdp-price strong")?.innerText ||
-                document.querySelector(".product-discountedPrice")?.innerText
-            ) || null,
-        rating:
-            document.querySelector(".index-overallRating")?.innerText?.match(/[\d.]+/)?.[0] || null,
-        reviewCount:
-            document.querySelector(".index-ratingsCount")?.innerText?.replace(/,/g, "").match(/\d+/)?.[0] || null,
-        reviews: Array.from(document.querySelectorAll(".user-review-reviewTextWrapper"))
-            .map((el) => el.innerText.replace(/\s+/g, " ").trim())
-            .filter(Boolean)
-            .slice(0, 5),
-    });
-}
+    function findMyntraStyleId() {
+        const pathMatch = window.location.pathname.match(/\/(\d{5,})(?:\/buy)?\/?$/i)
+            || window.location.pathname.match(/\/reviews\/(\d{5,})/i);
 
-function scrapeMeesho() {
-    return normalizeData({
-        title:
-            document.querySelector("h1")?.innerText?.trim() || null,
-        price:
-            normalizePrice(
-                firstText([
-                    "[class*='price']",
-                    "[data-testid='price']",
-                ])
-            ) || null,
-        rating:
-            document.querySelector("[label*='rating']")?.innerText?.match(/[\d.]+/)?.[0] || null,
-        reviewCount:
-            document.body.innerText.replace(/,/g, "").match(/\b\d+\s+Reviews?\b/i)?.[0]?.match(/\d+/)?.[0] || null,
-        reviews: Array.from(document.querySelectorAll('[data-testid="review"], [class*="review"], p'))
-            .map((el) => el.innerText.replace(/\s+/g, " ").trim())
-            .filter((text) => text.length > 30)
-            .slice(0, 5),
-    });
-}
+        if (pathMatch?.[1]) {
+            return pathMatch[1];
+        }
 
-// function scrapeMeesho() {
-//     const title =
-//         document.querySelector("h1")?.innerText?.trim() ||
-//         document.querySelector("span")?.innerText?.trim() ||
-//         null;
+        const bootstrap = findInlineScriptJson("window.__myx");
+        const styleId = bootstrap?.pdpData?.id;
 
-    
-//     let price =
-//         document.querySelector("h4")?.innerText ||
-//         document.querySelector("[data-testid='product-price']")?.innerText ||
-//         firstText(["[class*='price']"]);
+        return styleId ? String(styleId) : null;
+    }
 
-    
-//     if (!price) {
-//         const match = document.body.innerText.match(/₹\s?[\d,]+/);
-//         price = match ? match[0] : null;
-//     }
+    function getMyntraBootstrapData() {
+        return findInlineScriptJson("window.__myx");
+    }
 
-//     return normalizeData({
-//         title,
-//         price: normalizePrice(price),
-//         rating:
-//             document.querySelector("[label*='rating']")?.innerText?.match(/[\d.]+/)?.[0] || null,
-//         reviewCount:
-//             document.body.innerText
-//                 .replace(/,/g, "")
-//                 .match(/\b\d+\s+Reviews?\b/i)?.[0]
-//                 ?.match(/\d+/)?.[0] || null,
-//         reviews: Array.from(
-//             document.querySelectorAll('[data-testid="review"], [class*="review"], p')
-//         )
-//             .map((el) => el.innerText.replace(/\s+/g, " ").trim())
-//             .filter((text) => text.length > 30)
-//             .slice(0, 5),
-//     });
-// }
+    function extractMyntraReviewsFromBootstrap(bootstrap, limit = 5) {
+        const reviews = [];
+
+        const topReviews = bootstrap?.pdpData?.ratings?.reviewInfo?.topReviews || [];
+        for (const review of topReviews) {
+            addReviewCandidate(reviews, review?.reviewText || review?.review, limit);
+            if (reviews.length >= limit) {
+                return reviews;
+            }
+        }
+
+        const listReviews = bootstrap?.reviewsData?.reviews || [];
+        for (const review of listReviews) {
+            addReviewCandidate(reviews, review?.review || review?.reviewText, limit);
+            if (reviews.length >= limit) {
+                return reviews;
+            }
+        }
+
+        return reviews;
+    }
+
+    function extractMyntraReviewsFromDocument(doc, limit = 5) {
+        const reviews = [];
+        const selectors = [
+            ".user-review-reviewTextWrapper",
+            "[class*='user-review-reviewText']",
+            "[class*='review-userReviewText']",
+            "[class*='detailed-reviews'] p",
+            "[class*='ratingSection'] p",
+            "[class*='reviewText']",
+        ];
+
+        for (const selector of selectors) {
+            doc.querySelectorAll(selector).forEach((el) => {
+                addReviewCandidate(reviews, el.textContent, limit);
+            });
+
+            if (reviews.length >= limit) {
+                return reviews;
+            }
+        }
+
+        const scripts = Array.from(doc.querySelectorAll("script:not([src])"));
+
+        for (const script of scripts) {
+            const text = script.textContent || "";
+
+            if (!text.includes("window.__myx") && !/"reviewText"\s*:/.test(text)) {
+                continue;
+            }
+
+            if (text.includes("window.__myx")) {
+                const markerIndex = text.indexOf("window.__myx");
+                const equalsIndex = text.indexOf("=", markerIndex);
+                const parsed = equalsIndex === -1
+                    ? null
+                    : extractJsonObjectFromText(text, equalsIndex);
+
+                if (parsed) {
+                    for (const review of extractMyntraReviewsFromBootstrap(parsed, limit)) {
+                        addReviewCandidate(reviews, review, limit);
+                    }
+                }
+            }
+
+            for (const match of text.matchAll(/"reviewText"\s*:\s*"((?:\\.|[^"])*)"/gi)) {
+                addReviewCandidate(reviews, decodeJsonString(match[1]), limit);
+                if (reviews.length >= limit) {
+                    return reviews;
+                }
+            }
+
+            for (const match of text.matchAll(/"review"\s*:\s*"((?:\\.|[^"])*)"/gi)) {
+                addReviewCandidate(reviews, decodeJsonString(match[1]), limit);
+                if (reviews.length >= limit) {
+                    return reviews;
+                }
+            }
+
+            if (reviews.length >= limit) {
+                return reviews;
+            }
+        }
+
+        return reviews;
+    }
+
+    async function fetchMyntraReviews(limit = 5) {
+        const styleId = findMyntraStyleId();
+
+        if (!styleId) {
+            return [];
+        }
+
+        try {
+            const response = await fetch(`${window.location.origin}/reviews/${styleId}`, {
+                credentials: "include",
+                headers: {
+                    Accept: "text/html,application/xhtml+xml",
+                },
+            });
+
+            if (!response.ok) {
+                return [];
+            }
+
+            const html = await response.text();
+            const doc = new DOMParser().parseFromString(html, "text/html");
+            return extractMyntraReviewsFromDocument(doc, limit);
+        } catch (error) {
+            console.warn("TrueCart: fetchMyntraReviews failed:", error.message);
+            return [];
+        }
+    }
+
+    function scrapeMyntra() {
+        const bootstrap = getMyntraBootstrapData();
+        const pdp = bootstrap?.pdpData || null;
+        const ratings = pdp?.ratings || {};
+
+        const brand = pdp?.brand?.name || firstText([".pdp-title", "h1.pdp-title", "[class*='pdp-title']"]);
+        const name = pdp?.name || firstText([".pdp-name", "h1.pdp-name", "[class*='pdp-name']", "h1"]);
+        let title = null;
+
+        if (brand && name) {
+            const nameStartsWithBrand = name.toLowerCase().startsWith(brand.toLowerCase());
+            title = nameStartsWithBrand ? name : `${brand} ${name}`;
+        } else {
+            title = name || brand
+                || document.querySelector('meta[property="og:title"]')?.content?.trim()
+                || null;
+        }
+
+        const discounted = pdp?.price?.discounted ?? pdp?.price?.mrp ?? pdp?.mrp;
+        const price = (discounted != null ? normalizePrice(`₹${discounted}`) : null)
+            || normalizePrice(firstText([
+                ".pdp-price strong",
+                ".pdp-price",
+                "[class*='pdp-price']",
+                ".product-discountedPrice",
+                "[class*='pdp-discountedPrice']",
+            ]))
+            || findPriceByPattern();
+
+        const rating = normalizeNumber(String(ratings.averageRating ?? ""))
+            || normalizeNumber(firstText([
+                ".index-overallRating div",
+                ".index-overallRating",
+                "[class*='overallRating']",
+                "[class*='rating']",
+            ]))
+            || findRatingByPattern();
+
+        const reviewCount = normalizeNumber(String(
+            ratings.reviewInfo?.reviewsCount
+            ?? ratings.totalCount
+            ?? ""
+        ))
+            || normalizeNumber(firstText([
+                ".index-ratingsCount",
+                "[class*='ratingsCount']",
+                "[class*='count']",
+            ]))
+            || findReviewCountByPattern();
+
+        const reviews = extractMyntraReviewsFromBootstrap(bootstrap, 5);
+        const domReviews = reviews.length ? [] : extractReviewTexts([
+            ".user-review-reviewTextWrapper",
+            "[class*='user-review-reviewText']",
+            "[class*='reviewText']",
+            "[class*='detailed-reviews'] p",
+            "[class*='ratingSection'] p",
+        ]);
+
+        return normalizeData({
+            title,
+            price,
+            rating,
+            reviewCount,
+            reviews: reviews.length ? reviews : domReviews,
+        });
+    }
+
+    async function scrapeMyntraWithFallback() {
+        const data = scrapeMyntra();
+
+        if (data.reviews.length) {
+            return normalizeData(data);
+        }
+
+        const fetchedReviews = await fetchMyntraReviews(5);
+
+        if (fetchedReviews.length) {
+            return normalizeData({
+                ...data,
+                reviews: fetchedReviews,
+            });
+        }
+
+        const classFreeReviews = await getReviewsWithoutClass(6);
+
+        return normalizeData({
+            ...data,
+            reviews: classFreeReviews.length ? classFreeReviews : data.reviews,
+        });
+    }
+
+    function findMeeshoTitle() {
+        const title = firstText([
+            "h1",
+            "[class*='ProductTitle']",
+            "[class*='product-title']",
+            "[class*='ProductName']",
+            "[class*='productName']",
+            "[data-testid='product-title']",
+        ]);
+
+        if (title && title.length > 3) {
+            return title;
+        }
+
+        const ogTitle = document.querySelector('meta[property="og:title"]')?.content?.trim();
+
+        if (ogTitle) {
+            return ogTitle
+                .replace(/\s*\|\s*Meesho.*$/i, "")
+                .replace(/\s*-\s*Buy.*$/i, "")
+                .trim();
+        }
+
+        const docTitle = document.title
+            ?.replace(/\s*\|\s*Meesho.*$/i, "")
+            .replace(/\s*-\s*Buy.*$/i, "")
+            .trim();
+
+        return docTitle || null;
+    }
+
+    function findMeeshoPrice() {
+        return normalizePrice(firstText([
+            "[class*='PriceContainer']",
+            "[class*='ProductPrice']",
+            "[class*='product-price']",
+            "[class*='SellingPrice']",
+            "[data-testid='product-price']",
+            "[class*='PriceText']",
+            "h4",
+            "[class*='price']",
+        ])) || findPriceByPattern();
+    }
+
+    function findMeeshoRating() {
+        const labeled = Array.from(document.querySelectorAll("[label], [aria-label], [class*='Rating']"))
+            .map((el) => el.getAttribute("label") || el.getAttribute("aria-label") || el.innerText || "")
+            .map((text) => text.replace(/\s+/g, " ").trim())
+            .find((text) => /\d(\.\d)?/.test(text) && /rating|star/i.test(text));
+
+        return normalizeNumber(labeled)
+            || normalizeNumber(firstText([
+                "[class*='RatingValue']",
+                "[class*='rating-value']",
+                "[class*='StarRating']",
+                "[class*='RatingText']",
+                "[class*='Rating']",
+            ]))
+            || findRatingByPattern();
+    }
+
+    function findMeeshoReviewCount() {
+        const bodyText = document.body.innerText?.replace(/\s+/g, " ") || "";
+        const reviewMatch = bodyText.replace(/,/g, "").match(/(\d+)\s+Reviews?\b/i);
+        const ratingMatch = bodyText.replace(/,/g, "").match(/(\d+)\s+Ratings?\b/i);
+
+        return normalizeNumber(firstText([
+            "[class*='ReviewCount']",
+            "[class*='review-count']",
+            "[class*='RatingCount']",
+            "[class*='RatingReview']",
+        ]))
+            || (reviewMatch?.[1] || null)
+            || (ratingMatch?.[1] || null)
+            || findReviewCountByPattern();
+    }
+
+    function extractMeeshoDataFromScripts() {
+        const result = {
+            title: null,
+            price: null,
+            rating: null,
+            reviewCount: null,
+            reviews: [],
+        };
+
+        const scripts = Array.from(document.querySelectorAll("script:not([src])"));
+
+        for (const script of scripts) {
+            const text = script.textContent || "";
+
+            if (!text || text.length < 40) {
+                continue;
+            }
+
+            if (!/product|rating|review|price|name/i.test(text)) {
+                continue;
+            }
+
+            if (!result.title) {
+                const nameMatch = text.match(/"name"\s*:\s*"((?:\\.|[^"]){8,200})"/)
+                    || text.match(/"product_name"\s*:\s*"((?:\\.|[^"]){8,200})"/)
+                    || text.match(/"title"\s*:\s*"((?:\\.|[^"]){8,200})"/);
+
+                if (nameMatch?.[1] && !/meesho/i.test(nameMatch[1])) {
+                    result.title = decodeJsonString(nameMatch[1]);
+                }
+            }
+
+            if (!result.price) {
+                const priceMatch = text.match(/"price"\s*:\s*(\d+(?:\.\d+)?)/)
+                    || text.match(/"final_price"\s*:\s*(\d+(?:\.\d+)?)/)
+                    || text.match(/"selling_price"\s*:\s*(\d+(?:\.\d+)?)/);
+
+                if (priceMatch?.[1]) {
+                    result.price = normalizePrice(`₹${priceMatch[1]}`);
+                }
+            }
+
+            if (!result.rating) {
+                const ratingMatch = text.match(/"rating_score"\s*:\s*([0-9.]+)/)
+                    || text.match(/"average_rating"\s*:\s*([0-9.]+)/)
+                    || text.match(/"rating"\s*:\s*([0-9.]+)/);
+
+                if (ratingMatch?.[1]) {
+                    result.rating = normalizeNumber(ratingMatch[1]);
+                }
+            }
+
+            if (!result.reviewCount) {
+                const countMatch = text.match(/"review_count"\s*:\s*(\d+)/)
+                    || text.match(/"reviews_count"\s*:\s*(\d+)/)
+                    || text.match(/"rating_count"\s*:\s*(\d+)/);
+
+                if (countMatch?.[1]) {
+                    result.reviewCount = normalizeNumber(countMatch[1]);
+                }
+            }
+
+            for (const pattern of [
+                /"review_text"\s*:\s*"((?:\\.|[^"])*)"/gi,
+                /"reviewText"\s*:\s*"((?:\\.|[^"])*)"/gi,
+                /"comment"\s*:\s*"((?:\\.|[^"])*)"/gi,
+                /"comments"\s*:\s*"((?:\\.|[^"])*)"/gi,
+            ]) {
+                for (const match of text.matchAll(pattern)) {
+                    addReviewCandidate(result.reviews, decodeJsonString(match[1]), 5);
+                    if (result.reviews.length >= 5) {
+                        break;
+                    }
+                }
+            }
+
+            if (
+                result.title
+                && result.price
+                && result.rating
+                && result.reviewCount
+                && result.reviews.length >= 5
+            ) {
+                break;
+            }
+        }
+
+        return result;
+    }
+
+    function scrapeMeesho() {
+        const scriptData = extractMeeshoDataFromScripts();
+
+        const title = findMeeshoTitle() || scriptData.title;
+        const price = findMeeshoPrice() || scriptData.price;
+        const rating = findMeeshoRating() || scriptData.rating;
+        const reviewCount = findMeeshoReviewCount() || scriptData.reviewCount;
+
+        const reviews = extractReviewTexts([
+            "[class*='ReviewText']",
+            "[class*='review-text']",
+            "[class*='CommentText']",
+            "[class*='ReviewContainer'] p",
+            "[class*='ReviewContainer'] span",
+            "[class*='RatingReview'] p",
+            "[data-testid='review']",
+            "[class*='review'] p",
+        ]);
+
+        const structuredReviews = reviews.length
+            ? []
+            : extractStructuredReviewsFromDocument(document, 5);
+
+        return normalizeData({
+            title,
+            price,
+            rating,
+            reviewCount,
+            reviews: reviews.length
+                ? reviews
+                : (structuredReviews.length ? structuredReviews : scriptData.reviews),
+        });
+    }
+
+    async function scrapeMeeshoWithFallback() {
+        const data = scrapeMeesho();
+
+        if (data.reviews.length) {
+            return normalizeData(data);
+        }
+
+        const classFreeReviews = await getReviewsWithoutClass(6);
+
+        return normalizeData({
+            ...data,
+            reviews: classFreeReviews.length ? classFreeReviews : data.reviews,
+        });
+    }
 
 function getSiteName() {
     const host = window.location.hostname;
@@ -1077,6 +1514,14 @@ async function getProductDataAsync() {
 
     if (site === "flipkart") {
         return scrapeFlipkartWithFallback();
+    }
+
+    if (site === "myntra") {
+        return scrapeMyntraWithFallback();
+    }
+
+    if (site === "meesho") {
+        return scrapeMeeshoWithFallback();
     }
 
     const data = await getProductData();
@@ -1122,8 +1567,8 @@ function waitForProductData(timeoutMs = 12000) {
                 const site = getSiteName();
                 const timedOut = Date.now() - startedAt >= timeoutMs;
 
-                if (site === "flipkart") {
-                    if (hasEnoughFlipkartEvidence(data) || timedOut) {
+                if (site === "flipkart" || site === "myntra" || site === "meesho") {
+                    if (hasEnoughProductEvidence(data) || timedOut) {
                         finish(data);
                         return true;
                     }
@@ -1209,7 +1654,9 @@ function waitForProduct() {
 
 if (
     window.location.hostname.includes("amazon.") ||
-    window.location.hostname.includes("flipkart.")
+    window.location.hostname.includes("flipkart.") ||
+    window.location.hostname.includes("myntra.") ||
+    window.location.hostname.includes("meesho.")
 ) {
     waitForProduct();
 }

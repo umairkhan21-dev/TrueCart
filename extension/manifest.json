@@ -13,7 +13,11 @@
         "https://www.amazon.in/*",
         "https://www.amazon.com/*",
         "https://www.flipkart.com/*",
-        "https://flipkart.com/*"
+        "https://flipkart.com/*",
+        "https://www.myntra.com/*",
+        "https://myntra.com/*",
+        "https://www.meesho.com/*",
+        "https://meesho.com/*"
     ],
     "background": {
         "service_worker": "background.js"
@@ -24,7 +28,11 @@
                 "https://www.amazon.in/*",
                 "https://www.amazon.com/*",
                 "https://www.flipkart.com/*",
-                "https://flipkart.com/*"
+                "https://flipkart.com/*",
+                "https://www.myntra.com/*",
+                "https://myntra.com/*",
+                "https://www.meesho.com/*",
+                "https://meesho.com/*"
             ],
             "js": [
                 "content.js"
