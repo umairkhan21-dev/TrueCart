@@ -7,7 +7,8 @@ import axios from "axios"
 
 dotenv.config();
 const PORT = 5000;
-const AI_MODEL = "meta-llama/llama-3.1-70b-instruct";
+// const AI_MODEL = "meta-llama/llama-3.1-70b-instruct";
+const AI_MODEL = "stealth/ox-alpha"
 
 
 function cleanTitle(title) {
